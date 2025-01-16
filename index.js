@@ -2,6 +2,7 @@ const express = require('express');
 const app = express();
 const FFMPEG = require('./FFMPEG');
 const expressWs = require('express-ws')(app);
+const HTTP_PORT = 2000;
 
 // middleware para logar as requisições
 // app.use((req, res, next) => {
@@ -67,7 +68,17 @@ app.get('/camera', async (req, res) => {
     res.end();
     ffmpeg = null;
   });
+  req.on('end', () => {
+    ffmpeg.stop();
+    ffmpeg.removeAllListeners('data');
+    ffmpeg.removeAllListeners('error');
+    ffmpeg.removeAllListeners('exit');
+    res.end();
+    ffmpeg = null;
+  });
 });
 
 app.get('/*', express.static('html'));
-app.listen(2000);
+app.listen(HTTP_PORT, () => {
+  console.log('Servidor na url http://localhost:' + HTTP_PORT);
+});
