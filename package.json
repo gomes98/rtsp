@@ -1,0 +1,15 @@
+{
+  "dependencies": {
+    "express": "^4.21.2",
+    "express-ws": "^5.0.2"
+  },
+  "name": "rtsp-relay-server",
+  "version": "1.0.0",
+  "description": "conecta via rtsp nas câmeras e entrega o video para uma tag html",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js"
+  },
+  "author": "Mauricio Gomes",
+  "license": "ISC"
+}

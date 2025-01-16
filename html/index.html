@@ -1,0 +1,261 @@
+<!DOCTYPE html>
+<html lang="pt-BR" data-theme="dark">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link rel="apple-touch-icon" sizes="180x180" href="/img/apple-touch-icon.png">
+  <link rel="icon" type="image/png" sizes="32x32" href="/img/favicon-32x32.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="/img/favicon-16x16.png">
+  <title>RTSP Viewer</title>
+  <link href="/css/pico.min.css" rel="stylesheet">
+  <script src="/js/vue.js"></script>
+  <style>
+    .borderRounded {
+      position: relative;
+      border-style: groove;
+      border-radius: 2px;
+    }
+
+    .floatingAddButton {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      background-color: #007bff8c;
+      color: white;
+      border: none;
+      border-radius: 5px;
+      cursor: pointer;
+      padding: 0px;
+      padding-bottom: 0px;
+      z-index: 5;
+    }
+
+    .floatingCloseButton {
+      position: absolute;
+      top: 2%;
+      right: 2%;
+      padding: 0px;
+      padding-bottom: 5px;
+      background-color: #5d6b898c;
+      z-index: 5;
+    }
+
+    .floatingFullButton {
+      position: absolute;
+      bottom: 2%;
+      right: 2%;
+      padding: 0px;
+      padding-bottom: 5px;
+      background-color: #5d6b898c;
+      z-index: 5;
+    }
+
+    .floatingStatus {
+      position: absolute;
+      top: 2%;
+      left: 2%;
+      padding: 0px;
+      z-index: 5;
+      background-color: rgba(0, 0, 0, 0.327);
+      color: rgb(255, 255, 255);
+      text-shadow: 3px 2px 6px rgb(0, 0, 0);
+      /* font-size: smaller; */
+      z-index: 5;
+      padding: 0px 5px;
+    }
+
+    .circulo {
+      width: 50px;
+      height: 50px;
+      border-radius: 50%;
+      cursor: pointer;
+    }
+  </style>
+</head>
+
+<body>
+  <main id="app" class="container" style="padding-top: 0px;">
+    <!-- menu -->
+    <nav>
+      <ul>
+        <li><strong>RTSP Viewer</strong></li>
+      </ul>
+      <ul>
+        <li><label>
+            <input v-model="showstatus" name="opt-in" type="checkbox" role="switch" checked />
+            Mostrar status
+          </label></li>
+        <li><button @click="setMosaico(4)" :class="itemsCount == 4 ? 'secondary': ''">4C</button></li>
+        <li><button @click="setMosaico(9)" :class="itemsCount == 9 ? 'secondary': ''">9C</button></li>
+        <li><button @click="setMosaico(16)" :class="itemsCount == 16 ? 'secondary': ''">16C</button></li>
+      </ul>
+    </nav>
+    <!-- mosaico -->
+    <div :style="getStyle()">
+      <div v-for="r in itemsCount" :keys="r" class="borderRounded" @mouseover="videoHover(r)"
+        @doubleclick="fullScreen(r)">
+        <button @click="openModal(r)" class="floatingAddButton secondary circulo" v-show="hover == r"><img
+            src="/img/add-circle.svg"></button>
+        <button @click="remCam(r)" class="floatingCloseButton secondary circulo" v-show="hover == r"><img
+            src="/img/close-circle.svg"></button>
+        <button @click="fullScreen(r)" class="floatingFullButton secondary circulo" v-show="hover == r"><img
+            width="25px" src="/img/fullscreen.svg"></button>
+        <span :id="'status_'+r" class="floatingStatus" v-show="showstatus"></span>
+        <video style="display: block; margin: 0 auto" width="100%" height="auto" :id="'videoPreview_'+r" class="player"
+          webkit-playsinline="" muted autoplay>
+        </video>
+      </div>
+    </div>
+    <!-- modal -->
+    <dialog :open="modal">
+      <article>
+        <header>
+          <button @click="modal = false" aria-label="Close" rel="prev"></button>
+          <p>
+            <strong>Adicionar câmera</strong>
+          </p>
+        </header>
+        <span>
+          <input v-model="newUrl" type="url" name="url" placeholder="Url" aria-label="Url">
+          <button @click="addCam">Adicionar</button>
+        </span>
+      </article>
+    </dialog>
+  </main>
+</body>
+<script>
+  var app = new Vue({
+    el: '#app',
+    data: {
+      cols: 2,
+      rows: 2,
+      itemsCount: 4,
+      showstatus: true,
+      modal: false,
+      hover: null,
+      timeoutHover: null,
+      selectedCam: null,
+      newUrl: null,
+      cams: [],
+      ws: null,
+    },
+    methods: {
+      getStyle() {
+        return `display: grid; grid-template-columns: repeat(${this.cols}, 1fr); grid-template-rows: repeat(${this.rows}, 1fr); gap: 0.5rem;`;
+      },
+      setMosaico(qtd) {
+        this.cols = Math.sqrt(qtd);
+        this.rows = Math.sqrt(qtd);
+        this.itemsCount = qtd;
+        this.save();
+      },
+      videoHover(id) {
+        this.hover = id;
+        clearTimeout(this.timeoutHover);
+        this.timeoutHover = setTimeout(() => {
+          this.hover = null;
+        }, 2000);
+      },
+      openModal(id) {
+        this.modal = true;
+        this.selectedCam = id;
+      },
+      addCam() {
+        let b64 = btoa(this.newUrl);
+        let videoel = document.getElementById("videoPreview_" + this.selectedCam);
+        let source = document.createElement("source");
+        source.src = `/camera?b64=${b64}`;
+        videoel.appendChild(source);
+        videoel.load();
+        this.cams.push({
+          id: this.selectedCam,
+          url: this.newUrl,
+        });
+        this.modal = false;
+        this.save();
+      },
+      remCam(id) {
+        let videoel = document.getElementById("videoPreview_" + id);
+        let src = videoel.getElementsByTagName("source");
+        // remove os antigos
+        for (const key in src) {
+          if (Object.prototype.hasOwnProperty.call(src, key)) {
+            const element = src[key];
+            videoel.removeChild(element);
+          }
+        }
+        videoel.load();
+        this.cams = this.cams.filter((cam) => cam.id != id);
+        this.save();
+      },
+      save() {
+        localStorage.setItem('cams', JSON.stringify({ cams: this.cams, cols: this.cols, rows: this.rows, itemsCount: this.itemsCount, showstatus: this.showstatus }));
+      },
+      setStatus(data) {
+        let obj = JSON.parse(data.data);
+        let camIdx = this.cams.findIndex((cam) => cam.url == obj.url);
+        if (obj.event == 'codec') {
+          this.cams[camIdx].codec = obj.data;
+        }
+        // atualiza o status do monitor
+        if (obj.event == 'bitrate') {
+          let cv = this.humanReadableSize(obj.data);
+          let html = `Bitrate: ${cv}'s`;
+          let codec = this.cams[camIdx].codec;
+          if (codec) {
+            let video = codec.streams.find((stream) => stream.codec_type == 'video');
+            html += `<br> Res:${video.width}x${video.height} C:${video.codec_name}`;
+          }
+          document.getElementById('status_' + this.cams[camIdx].id).innerHTML = html;
+        }
+      },
+      humanReadableSize(bytes) {
+        if (!bytes) return "0 Bytes";
+        bytes = bytes / 1024;
+        if (bytes < 1024) return bytes.toFixed(2) + " KB";
+        else if (bytes < 1024 * 1024) return (bytes / 1024.0).toFixed(2) + " MB";
+        else return (bytes / 1024.0 / 1024.0).toFixed(2) + " GB";
+      },
+      fullScreen(id) {
+        let videoel = document.getElementById("videoPreview_" + id);
+        if (videoel.requestFullscreen) {
+          videoel.requestFullscreen();
+        } else if (videoel.mozRequestFullScreen) { // Firefox
+          videoel.mozRequestFullScreen();
+        } else if (videoel.webkitRequestFullscreen) { // Chrome, Safari e Opera
+          videoel.webkitRequestFullscreen();
+        } else if (videoel.msRequestFullscreen) { // IE/Edge
+          videoel.msRequestFullscreen();
+        }
+      }
+    },
+    watch: {
+      showstatus: function (val) {
+        this.save();
+      }
+    },
+    mounted() {
+      this.ws = new WebSocket("/camera");
+      this.ws.onmessage = this.setStatus
+      let cams = localStorage.getItem('cams');
+      try {
+        let obj = JSON.parse(cams);
+        this.cols = obj.cols;
+        this.rows = obj.rows;
+        this.itemsCount = obj.itemsCount;
+        this.showstatus = obj.showstatus ?? true;
+        obj.cams.forEach(element => {
+          this.selectedCam = element.id;
+          this.newUrl = element.url;
+          this.addCam();
+        });
+      } catch (error) {
+        console.error(error);
+      }
+    }
+  });
+</script>
+
+</html>
