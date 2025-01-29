@@ -10,6 +10,7 @@
   <title>RTSP Viewer</title>
   <link href="/css/pico.min.css" rel="stylesheet">
   <script src="/js/vue.js"></script>
+  <script src="/js/hls.js"></script>
   <style>
     .borderRounded {
       position: relative;
@@ -72,6 +73,41 @@
       border-radius: 50%;
       cursor: pointer;
     }
+
+    .player {
+      width: 100% !important;
+      height: 100%;
+    }
+
+    /* Classe para Fade In */
+    .fadeIn {
+      animation: fadeInAnimation 1s forwards;
+    }
+
+    @keyframes fadeInAnimation {
+      from {
+        opacity: 0;
+      }
+
+      to {
+        opacity: 1;
+      }
+    }
+
+    /* Classe para Fade Out */
+    .fadeOut {
+      animation: fadeOutAnimation 1s forwards;
+    }
+
+    @keyframes fadeOutAnimation {
+      from {
+        opacity: 1;
+      }
+
+      to {
+        opacity: 0;
+      }
+    }
   </style>
 </head>
 
@@ -83,10 +119,6 @@
         <li><strong>RTSP Viewer</strong></li>
       </ul>
       <ul>
-        <li><label>
-            <input v-model="showstatus" name="opt-in" type="checkbox" role="switch" checked />
-            Mostrar status
-          </label></li>
         <li><button @click="setMosaico(4)" :class="itemsCount == 4 ? 'secondary': ''">4C</button></li>
         <li><button @click="setMosaico(9)" :class="itemsCount == 9 ? 'secondary': ''">9C</button></li>
         <li><button @click="setMosaico(16)" :class="itemsCount == 16 ? 'secondary': ''">16C</button></li>
@@ -96,15 +128,13 @@
     <div :style="getStyle()">
       <div v-for="r in itemsCount" :keys="r" class="borderRounded" @mouseover="videoHover(r)"
         @doubleclick="fullScreen(r)">
-        <button @click="openModal(r)" class="floatingAddButton secondary circulo" v-show="hover == r"><img
-            src="/img/add-circle.svg"></button>
-        <button @click="remCam(r)" class="floatingCloseButton secondary circulo" v-show="hover == r"><img
-            src="/img/close-circle.svg"></button>
-        <button @click="fullScreen(r)" class="floatingFullButton secondary circulo" v-show="hover == r"><img
-            width="25px" src="/img/fullscreen.svg"></button>
-        <span :id="'status_'+r" class="floatingStatus" v-show="showstatus"></span>
-        <video style="display: block; margin: 0 auto" width="100%" height="auto" :id="'videoPreview_'+r" class="player"
-          webkit-playsinline="" muted autoplay>
+        <button @click="openModal(r)" class="floatingAddButton secondary circulo"
+          :class="hover == r ? 'fadeIn' : 'fadeOut'"><img src="/img/add-circle.svg"></button>
+        <button @click="remCam(r)" class="floatingCloseButton secondary circulo"
+          :class="hover == r ? 'fadeIn' : 'fadeOut'"><img src="/img/close-circle.svg"></button>
+        <button @click="fullScreen(r)" class="floatingFullButton secondary circulo"
+          :class="hover == r ? 'fadeIn' : 'fadeOut'"><img width="25px" src="/img/fullscreen.svg"></button>
+        <video :id="'videoPreview_'+r" class="player video-js vjs-default-skin" webkit-playsinline="" muted autoplay>
         </video>
       </div>
     </div>
@@ -117,12 +147,32 @@
             <strong>Adicionar câmera</strong>
           </p>
         </header>
-        <span>
-          <input v-model="newUrl" type="url" name="url" placeholder="Url" aria-label="Url">
-          <button @click="addCam">Adicionar</button>
-        </span>
+        <table>
+          <tr v-for="cam in cameras" :key="cam.id">
+            <td>
+              {{cam.id}}
+            </td>
+            <td>
+              {{cam.name}}
+            </td>
+            <td>
+              <button @click="addCam(cam)">Adicionar</button>
+            </td>
+            <td>
+              <label>
+                <input v-model="cam.hls" name="opt-in" type="checkbox" role="switch" checked />
+                HLS
+              </label>
+            </td>
+          </tr>
+        </table>
       </article>
     </dialog>
+    <div v-for="c in cams">
+      <pre>
+        {{c}}
+      </pre>
+    </div>
   </main>
 </body>
 <script>
@@ -140,6 +190,7 @@
       newUrl: null,
       cams: [],
       ws: null,
+      cameras: []
     },
     methods: {
       getStyle() {
@@ -162,19 +213,26 @@
         this.modal = true;
         this.selectedCam = id;
       },
-      addCam() {
-        let b64 = btoa(this.newUrl);
-        let videoel = document.getElementById("videoPreview_" + this.selectedCam);
-        let source = document.createElement("source");
-        source.src = `/camera?b64=${b64}`;
-        videoel.appendChild(source);
-        videoel.load();
-        this.cams.push({
-          id: this.selectedCam,
-          url: this.newUrl,
-        });
+      addCam(c) {
+        console.log(c, this.selectedCam);
+        if (!c.hls) {
+          let videoel = document.getElementById("videoPreview_" + this.selectedCam);
+          let source = document.createElement("source");
+          source.src = `/video/${c.id}`;
+          videoel.appendChild(source);
+          videoel.load();
+        } else {
+          if (Hls.isSupported()) {
+            const video = document.getElementById("videoPreview_" + this.selectedCam);
+            const hls = new Hls();
+            hls.loadSource(`/hls/cam_${c.id}_.m3u8`);
+            hls.attachMedia(video);
+            hls.on(Hls.Events.MANIFEST_PARSED, function () {
+              video.play();
+            });
+          }
+        }
         this.modal = false;
-        this.save();
       },
       remCam(id) {
         let videoel = document.getElementById("videoPreview_" + id);
@@ -229,6 +287,17 @@
         } else if (videoel.msRequestFullscreen) { // IE/Edge
           videoel.msRequestFullscreen();
         }
+      },
+      getCams() {
+        fetch('/cameras')
+          .then(response => response.json())
+          .then(data => {
+            this.cameras = data;
+            // adicinando hls a todas as cameras
+            this.cameras.forEach(element => {
+              element.hls = false;
+            });
+          });
       }
     },
     watch: {
@@ -237,23 +306,7 @@
       }
     },
     mounted() {
-      this.ws = new WebSocket("/camera");
-      this.ws.onmessage = this.setStatus
-      let cams = localStorage.getItem('cams');
-      try {
-        let obj = JSON.parse(cams);
-        this.cols = obj.cols;
-        this.rows = obj.rows;
-        this.itemsCount = obj.itemsCount;
-        this.showstatus = obj.showstatus ?? true;
-        obj.cams.forEach(element => {
-          this.selectedCam = element.id;
-          this.newUrl = element.url;
-          this.addCam();
-        });
-      } catch (error) {
-        console.error(error);
-      }
+      this.getCams();
     }
   });
 </script>

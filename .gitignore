@@ -1,2 +1,5 @@
 /node_modules
 /package-lock.json
+/cameras.json
+*.ts
+*.m3u8
