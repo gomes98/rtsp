@@ -5,11 +5,30 @@
 
 Este projeto foi desenvolvido para simplificar a visualização de câmeras de CFTV, facilitando o teste e a validação de uso.
 
-Ele não realiza a conversão de formato de vídeo, transmitindo exatamente o que a câmera está enviando. Isso resulta em baixa demanda de recursos da máquina. O sistema foi testado com câmeras e DVRs da Intelbras e Hikvision, utilizando os codecs H264 e H265.
+Ele não realiza a conversão de formato de vídeo em H264, já se o video for em qualquer outro formato ele converte para H264. Isso resulta em baixa demanda de recursos da máquina. O sistema foi testado com câmeras e DVRs da Intelbras e Hikvision, utilizando os codecs H264 e H265.
 
-O projeto oferece três mosaicos para visualização de 4, 9 e 16 câmeras, com a opção de desativar as informações do codec.
+O projeto oferece três mosaicos para visualização de 4, 9 e 16 câmeras.
 
-Como o sistema não possui banco de dados, os dados das câmeras são salvos no localStorage do seu navegador. Portanto, ao acessar de outro dispositivo, as câmeras não estarão cadastradas.
+Para cadastrar as cameras deve-se criar um arquivo JSON com o nome de cameras.json na raiz do projeto com o seguinte formato:
+```
+[
+  {
+    "id": 1,
+    "name": "DVR INTELBRAS CANAL 1",
+    "principal": "rtsp://USUARIO:SENHA@IPouDDNSdoDVR:PORTARTSP/cam/realmonitor?channel=1&subtype=0"
+  },
+  {
+    "id": 2,
+    "name": "DVR INTELBRAS CANAL 2",
+    "principal": "rtsp://USUARIO:SENHA@IPouDDNSdoDVR:PORTARTSP/cam/realmonitor?channel=2&subtype=0"
+  },
+  {
+    "id": 3,
+    "name": "DVR HIKIVISION CANAL 1",
+    "principal": "rtsp://USUARIO:SENHA@IPouDDNSdoDVR:PORTARTSP/Streaming/Channels/101"
+  }
+]
+```
 
 # Instalação
 Clone esse repositorio.
